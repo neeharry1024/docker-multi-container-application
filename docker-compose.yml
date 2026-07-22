@@ -1,0 +1,97 @@
+version: "3.7"
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+
+    container_name: redis
+
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+
+    container_name: backend
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      API_PORT: ${API_PORT}
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      - mysql
+      - redis
+
+    networks:
+      - app-network
+
+  frontend:
+    image: nginx:latest
+
+    container_name: frontend
+
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+
+    volumes:
+      - ./frontend/index.html:/usr/share/nginx/html/index.html
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
+
+    depends_on:
+      - backend
+
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
